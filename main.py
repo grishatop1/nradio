@@ -1,11 +1,12 @@
 import os
 import discord
 import yt_dlp
+import aiohttp
+import asyncio
 
 from dotenv import load_dotenv
 from discord.ext import commands
 from discord.ext.commands import Context
-from pytube import YouTube
 
 from utils import youtube_url_validation
 
@@ -27,21 +28,12 @@ TOKEN = os.getenv('TOKEN')
 bot = commands.Bot(command_prefix='!', intents=discord.Intents.all())
 
 @bot.command()
-async def p(ctx: Context, arg):
-    if not (url := youtube_url_validation(arg)):
-        return
-    url = url.group(0)
-
+async def p(ctx: Context, *, arg):
     if not ctx.author.voice:
         await ctx.channel.send("Moras biti u voice kanalu prvo")
         return
-
-    try:
-        yt = YouTube(url)
-        title = yt.title
-    except:
-        await ctx.channel.send("Nmg da ucitam, posalji opet mozda")
-        return
+    
+    loading_msg = await ctx.channel.send("Ucitavam...")
     
     if not bot.voice_clients:
         try:
@@ -52,17 +44,24 @@ async def p(ctx: Context, arg):
     else:
         voice_client = bot.voice_clients[0]
 
-    await ctx.channel.send(f"{ctx.author.name} je pustio - **{title}**")
-
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            song_info = ydl.extract_info(url, download=False)
+            if url := youtube_url_validation(arg):
+                url = url.group(0)
+                song_info = ydl.extract_info(url, download=False)
+            else:
+                song_info = ydl.extract_info(f"ytsearch:{arg}", download=False)['entries'][0]
     except:
-        await ctx.channel.send(f"YouTube zajebava, pokusaj opet")
+        await ctx.channel.send(f"Nesto nije u redu, pokusaj opet")
         return
+    
+    await loading_msg.delete()
+    
+    await ctx.channel.send(f"{ctx.author.name} je pustio - **{song_info['title']}**")
 
     if voice_client.is_playing():
         voice_client.stop()
+        await asyncio.sleep(2)
 
     voice_client.current_url = song_info["url"]
     voice_client.play(discord.FFmpegPCMAudio(song_info["url"]))
@@ -73,5 +72,22 @@ async def s(ctx: Context):
         bot.voice_clients[0].stop()
         await bot.voice_clients[0].disconnect(force=True)
         await ctx.channel.send("https://tenor.com/view/moistcritikal-leaving-meme-gif-23706301")
+
+@bot.command()
+async def mmm(ctx: Context):
+    async with aiohttp.ClientSession() as session:
+        async with session.get('https://api.waifu.pics/sfw/neko') as resp:
+            data = await resp.json()
+            await ctx.channel.send(data['url'])
+
+@bot.command()
+async def source(ctx: Context):
+    if bot.voice_clients:
+        if not bot.voice_clients[0].is_playing():
+            await ctx.channel.send("Mora nesta svirati prvo")
+        else:
+            await ctx.channel.send(bot.voice_clients[0].current_url)
+    else:
+        await ctx.channel.send("Mora nesta svirati prvo")
 
 bot.run(TOKEN)
