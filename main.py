@@ -1,4 +1,5 @@
 import os
+import sys
 import discord
 import yt_dlp
 import aiohttp
