@@ -90,4 +90,8 @@ async def source(ctx: Context):
     else:
         await ctx.channel.send("Mora nesta svirati prvo")
 
+@bot.command()
+async def restart(ctx: Context):
+    os.execl(sys.executable, sys.executable, *sys.argv)
+
 bot.run(TOKEN)
